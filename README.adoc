@@ -1,0 +1,378 @@
+= Thirteen
+Christopher Williams
+:toc:
+:toc-placement!:
+:ndash: &#x2013;
+:mdash: &#x2014;
+:lb: &#x7B;
+:rb: &#x7D;
+
+ifdef::env-github[]
+:tip-caption: :bulb:{nbsp}Tip
+:note-caption: :information_source:{nbsp}Note
+:important-caption: :heavy_exclamation_mark:{nbsp}Important
+:caution-caption: :fire:{nbsp}Caution
+:warning-caption: :warning:{nbsp}Warning
+endif::[]
+
+This is a simple Gopher server with CGI support.
+The primary goals are to be simple, easy to use, and correct (according to the relevant RFCs and specs; see https://www.rfc-editor.org/rfc/rfc1436[RFC 1436] and https://www.rfc-editor.org/rfc/rfc3875[RFC 3875]).
+
+toc::[]
+
+
+== System Requirements
+
+* Go 1.19 or later
+* Linux
+
+Thirteen has been tested only on Linux so far;
+it should work on other Unix systems (e.g., +++{Free,Net,Open}BSD+++ or Solaris) without modification
+and may work on non-Unix systems with a little tweaking.
+At the very least, a new `sys_$(GOOS).go` file (e.g., `sys_windows.go` or `sys_plan9.go`) will need to be written for the desired target OS.
+
+(In my considered opinion, one would have to be in the set {lb}insane, naïve, masochistic{rb} to run server software on Windows, given how slow it is at file access and process creation operations.
+(See https://www.bitsnbites.eu/benchmarking-os-primitives/[Benchmarking OS primitives] and https://sqlite.org/fasterthanfs.html[35% Faster Than The Filesystem], for example.)
+But if you want to be or already are in that set, feel free to port this to Windows.)
+
+== Building
+
+Run `make build` or just `make`.
+
+== Testing
+
+Run `make test`.
+
+== Installing
+
+After building, run `sudo make install`.
+This will install all files in directories under the default prefix directory (`/usr/local`).
+Run `sudo make install PREFIX=__prefix__` instead to change the install prefix directory.
+
+== Running
+
+Run `thirteen` with any <<Options,options>> you want to set.
+
+If running on port 70 (or any other "`privileged`" port number), you may need to run `thirteen` as root, such as with `sudo`;
+if so, it's recommended to use the `-user _user_` option with a user created specifically for Gopher, and `thirteen` will change to that user immediately after it starts listening on the privileged port.
+
+It may be possible to run as a service (through SystemD or otherwise);
+this has not been tested, and doing so is at your own risk.
+
+== Options
+
+`-desc _description_`::    The server description.
+                           There is no default value.
+`-exclude _extension_`::   Exclude files with the extension _extension_.
+                           E.g., `-exclude .hidden` or `-exclude hidden` will cause Thirteen not to serve any file with an extension of `hidden`.
+`-listen {startsb}__host__:{endsb}__port__`::
+                           The port and optionally host to listen on.
+                           The default is 70 which means listen on port 70 on all interfaces.
+`-maxconn _connections_`:: The maximum number of simultaneous connections.
+                           The default is 1000.
+`-root _directory_`::      The site root directory.
+                           The default is `/srv/gopher`.
+`-rtmo _seconds_`::        Request timeout in seconds.
+                           How long to wait to receive a complete request after a connection is accepted.
+                           Setting to 0 disables request timeout (not recommended).
+                           The default is 60.
+`-serverhost _name_`::     The server host name.
+                           The default is `localhost`.
+`-serverport _port_`::     The port to include in menus.
+                           The default is to use the port to listen on.
+`-user _user_`::           The user to run as.
+                           There is no default value.
+`-wtmo _seconds_`::        Response timeout in seconds.
+                           How long to wait for progress to be made on the response.
+                           Setting to 0 disables response timeout.
+                           The default is 300.
+
+== Features
+
+This server is intentionally kept simple and therefore has few features:
+
+* Index files for directory requests
+* CGIs
+* Path escaping (to support files with "`weird`" characters)
+
+=== Index Files
+
+If a selector names a directory, Thirteen will look for an index file named `index.cgi` or `index.map` (in that order) in the directory;
+the first index file found will be used.
+
+Index files allow a site to hide its internal mechanisms (see https://www.w3.org/Provider/Style/URI[Cool URIs don't change]).
+For example, if a site owner wants to replace a regular text file with a CGI, she can do so easily{mdash}she can drop in an `index.cgi` file in place of `index.map` (or just leave `index.map` where it is; `index.cgi` will be used in preference to `index.map`).
+Similarly, if she wishes to switch to a different Gopher server, she may simply have to rename the underlying files on the server (e.g., from `index.map` to `gophermap`).
+In either case, existing selectors will still be valid.
+
+=== CGIs
+
+A CGI is a script or other executable that is run by a server in response to a client request according to the Common Gateway Interface (see https://www.rfc-editor.org/rfc/rfc3875.txt[RFC 3875]).
+Thirteen runs any executable file with an extension of `.cgi` as a CGI.
+The output from a CGI is sent unmodified to the client (in effect, Thirteen treats all CGIs as NPH (Non-Parsed Header) scripts).
+
+Thirteen supports both query strings (`QUERY_STRING`) and extra path information (`PATH_INFO`) in requests.
+
+==== Query String
+
+The query string is any text after the first `?` in a selector (the query string does not include the `?` itself).
+If there is no `?` in a selector, the query string is empty.
+
+==== Script Path and Extra Path Information
+
+The script path (`SCRIPT_NAME`) is the longest leading part of the requested path that names a script, either directly (e.g., `/foo/bar.cgi`) or through an index CGI (e.g., `/foo/bar`, where `/foo/bar` contains `index.cgi`).
+The extra path information is the path that remains, if any, after the script path.
+
+In a request for either `/foo/bar.cgi/path/info` or `/foo/bar/path/info`, the extra path information is `/path/info` (assuming neither `/foo/bar/path` nor `/foo/bar/path/info` contain an index CGI).
+
+==== Environment Variables
+
+Here is a complete list of environment variables passed to a CGI:
+
+`PATH`:: a safe executable search path for a CGI
+`GATEWAY_INTERFACE`:: "`CGI/1.1`"
+`SERVER_PROTOCOL`:: "`GOPHER`"
+`SERVER_SOFTWARE`:: "`Thirteen/0.0.0`"
+`REQUEST_METHOD`:: "`GET`" (the only method that Gopher supports)
+`PATH_INFO`:: the extra path information
+`PATH_TRANSLATED`:: the file system path corresponding to `PATH_INFO`
+`SERVER_NAME`::
+`SERVER_HOST`:: the server host name
+`SERVER_PORT`:: the server port
+`QUERY_STRING`::
+`QUERY_STRING_URL`:: the query string
+`REMOTE_ADDR`::
+`REMOTE_HOST`:: the client's address
+`REMOTE_PORT`:: the client's port
+`DOCUMENT_ROOT`::
+`GOPHER_DOCUMENT_ROOT`:: the site root directory
+`SCRIPT_NAME`:: the path to the script
+`SCRIPT_FILENAME`::
+`GOPHER_SCRIPT_FILENAME`:: the file system path corresponding to `SCRIPT_NAME`, including the script's file name
+`SERVER_DESCRIPTION`:: the site description
+`SEARCHREQUEST`::
+`X_GOPHER_SEARCH`::
+`QUERY_STRING_SEARCH`:: the search string (for type "`7`" selectors)
+`REQUEST`::
+`SELECTOR`::
+`GOPHER_DOCUMENT_SELECTOR`:: the full selector
+`THIRTEEN_UPTIME`:: the uptime of the server in seconds
+`THIRTEEN_REQUESTS`:: the number of requests served
+`THIRTEEN_BYTES`:: the number of bytes served
+
+// XXX geomyidae seems to set REQUEST to the same as SELECTOR. is that compatible with the other servers?
+////
+geomyidae:   $SELECTOR
+PyGopherd:   $SELECTOR
+Gophernicus: $SELECTOR
+Bucktooth:   $SELECTOR before ?
+
+////
+
+==== Compatibility With Other Gopher Servers
+
+Thirteen attempts to be compatible with existing CGI scripts written for link:https://gophernicus.org/[Gophernicus], link:http://gopher.quux.org:70/devel/gopher/pygopherd[PyGopherd], link:gopher://gopher.floodgap.com:70/1/buck[Bucktooth], link:gopher://gopher.conman.org:70/1Gopher%3ASrc%3A[port70], link:https://r-36.net/scm/geomyidae/[geomyidae], and link:https://motsognir.sourceforge.net/[Motsognir] by setting the following nonstandard environment variables:
+
+* `SERVER_HOST`              (Bucktooth)
+* `QUERY_STRING_URL`         (Motsognir)
+* `REMOTE_PORT`              (PyGopherd, Bucktooth)
+* `GOPHER_DOCUMENT_ROOT`     (port70)
+* `GOPHER_SCRIPT_FILENAME`   (port70)
+* `SERVER_DESCRIPTION`       (Gophernicus)
+* `SEARCHREQUEST`            (Gophernicus, PyGopherd, geomyidae)
+* `X_GOPHER_SEARCH`          (geomyidae)
+* `QUERY_STRING_SEARCH`      (Motsognir)
+* `REQUEST`                  (Gophernicus, PyGopherd, geomyidae, Bucktooth)
+* `SELECTOR`                 (Gophernicus, PyGopherd, geomyidae, Bucktooth)
+* `GOPHER_DOCUMENT_SELECTOR` (port70)
+
+[IMPORTANT]
+--
+Bucktooth omits the query string, if any, from the end of `REQUEST`.
+All other servers set `REQUEST` equal to `SELECTOR`.
+This makes a difference only when query strings are used.
+--
+
+Thirteen also runs CGIs with the following command-line arguments, as expected by geomyidae CGI scripts:
+
+[,sh]
+----
+executable.cgi $SEARCHREQUEST $QUERY_STRING $SERVER_NAME $SERVER_PORT $PATH_INFO $SELECTOR
+----
+
+[NOTE]
+--
+geomyidae through version 0.96 incorrectly sets variables as follows:
+
+[width=50%]
+|===
+|CGI/1.1 name      |geomyidae name
+
+|`SCRIPT_NAME`     |`PATH_INFO`
+|`SCRIPT_FILENAME` |`PATH_TRANSLATED`
+|`PATH_INFO`       |`TRAVERSAL`
+|`PATH_TRANSLATED` |N/A
+|===
+
+Any CGI script written for geomyidae that uses either `PATH_INFO` or `PATH_TRANSLATED` will need to be adjusted to work with other CGI-capable Gopher servers such as Thirteen--either change them to the standard/de-facto standard names `SCRIPT_NAME` and `SCRIPT_FILENAME`, or use a workaround such as the following at the top of a CGI script:
+
+[,sh]
+----
+TRAVERSAL="$PATH_INFO"
+PATH_INFO="$SCRIPT_NAME"
+PATH_TRANSLATED="$SCRIPT_FILENAME"
+----
+
+If the script uses positional parameters (`+++$5+++` for `PATH_INFO`) rather than environment variables, no changes should be needed.
+--
+
+[NOTE]
+--
+Unlike geomyidae, Thirteen does not support "`dynamic`" CGIs.
+A dynamic CGI is essentially a CGI whose output is interpreted by the server as a gph file (geomyidae's version of a gophermap), which Thirteen doesn't support.
+If needed, the output from a dynamic CGI could be piped through a helper script to convert gph output to a Gopher menu.
+--
+
+=== Path Escaping
+
+A Gopher selector cannot contain certain special characters, and Thirteen reserves the `?` character to delimit a query string, so Thirteen supports requests with percent-encoded paths to allow a client to request a file with special characters in its name.
+Percent encoding is the same as that used in URLs{mdash}a `%` followed by two case-insensitive hexadecimal digits represents a single byte.
+
+Here is a list of all special characters that must be encoded, along with their percent encoding:
+
+* Tab: `%09`
+* Linefeed: `%0A`
+* Carriage return: `%0D`
+* Percent `%`: `%25`
+* Question mark `?`: `%3F`
+
+Any other character may be percent-encoded but is not required to be.
+
+Note that percent-encoded bytes are decoded only in the path portion;
+any percent-encoded byte in a query string or search string is preserved and passed as-is to the requested CGI (if a CGI is requested, that is).
+For example, if a user enters the search string `%42`, it will be sent as three bytes (`%`, `4` and `2`) in the Gopher request{empty}footnote:[This assumes the client handles the search string properly, which isn't necessarily a safe assumption. w3m, for example, converts each space in the user's input to `+`.], and the CGI will see the same three bytes in the `SEARCHREQUEST` environment variable.
+
+== Non-features
+
+The following features will likely never be directly supported by Thirteen:
+
+* Gophermaps.
+* Directory listings.
+* Server status at `/server-status` (as in Gophernicus and Apache).
+  This is not enterprise-grade server software that needs monitoring.
+  (That said, a CGI could implement this resource though with some limitations.)
+* Handling `URL:` selectors.
+* Sessions.
+* Serving from user directories.
+* Gopher+ compatibility.
+  Nope.
+  It's a dead protocol.
+  It's time to move on.
++
+Also: friends don't let friends use Gopher+ clients.
+
+=== Why no Gophermap or Directory Listing Support?
+
+In a nutshell, a CGI can provide support for these features so the server doesn't have to.
+
+A properly written CGI in the site's root can parse a `gophermap` file or list files in any directory.
+The server will run `index.cgi` found in the site's root directory when none of the directories in the requested path contains an `index.cgi` file (and also the last directory doesn't contain an `index.map` file);
+the server provides the extra path information to the CGI so it can know which directory is being requested.
+The CGI can then parse the `gophermap` in the requested directory and return the Gopher menu to the client;
+if the directory doesn't contain a `gophermap`, the CGI can instead list the contents of the directory.
+
+The CGI could also support `index.gph` files (from geomyidae) instead of or in addition to `gophermap` if you prefer that format.
+Or it could support any other custom index file format (perhaps some sort of template or markup format).
+
+The sky's the limit!
+
+(The CGI does not have to be in the site's root directory;
+if you want `gophermap` and/or directory listing support in only part of your site, the CGI can be in a subdirectory under the root.
+In that case, only directories underneath that subdirectory will gain `gophermap` and/or directory listing support.)
+
+Surely that works only in theory, right?
+Nope!
+I've already implemented these ideas to render `gophermap`, GPH, HTML, and gemtext files and directory listings as Gopher menus, and it works quite nicely!
+You can even play with it yourself; see the section xref:example-sites/README.adoc#dynamic-site[Dynamic Site].
+
+== Example Sites
+
+You can find example sites under link:example-sites[] that can be served up with the provided commands.
+
+== Why the Name "`Thirteen`"?
+
+As you may know, the Gopher protocol and software originated at the University of Minnesota (UMN), whose mascot is a gopher.
+You may also know that Minnesota itself is known as the Gopher State.
+You might even know that Minnesota got its nickname from an 1857 political cartoon depicting gophers.
+
+But what you may not know is that "`gopher`" is Minnesota slang for a thirteen-lined ground squirrel!
+UMN's mascot? A thirteen-lined ground squirrel.
+The gophers in that political cartoon? Also thirteen-lined ground squirrels.
+(We can thank Robert O. Sweeny, the artist of that political cartoon, for calling them gophers.)
+
+The thirteen-lined ground squirrel is in the _Sciuridae_ (squirrel) family, while a true gopher (aka "`pocket gopher`") is in the _Geomyidae_ family.
+You might have heard of the https://r-36.net/scm/geomyidae/[geomyidae] Gopher server; perhaps it should have been called "`sciuridae`" instead. 😉
+
+So to honor the original "`gopher`" after which the protocol and software were named, I decided to call this server "`Thirteen`".
+
+== Common Tasks
+
+[qanda]
+How do I serve content from user directories?::
++
+--
+[WARNING]
+====
+Serving Gopher content from user directories can introduce security risks.
+
+If CGI support is not disabled, all CGIs are run as the same user as the server (e.g., `nobody` or `gopher`), regardless of who owns the CGI file.
+This means that any user can have a CGI in their user directory that can access any file accessible by the server.
+
+Apache solves this issue with the `suexec` module;
+Thirteen has no such module, and there are no plans to implement it.
+====
+
+To serve user directories, create a directory under the Gopher site root for any user with Gopher content;
+for example, if the site root is `/srv/gopher` and the user name is `goldy`, create a directory called `/srv/gopher/~goldy` (or even something like `/srv/gopher/users/goldy` or `/srv/gopher/@goldy`).
+Ensure this directory has the correct ownership and/or permissions to allow the user to edit files under it.
+
+For convenience to the user, you can create a symlink in the user's home directory named `public_gopher` that links to that directory;
+for example, make a symlink from `/home/goldy/public_gopher` to `/srv/gopher/~goldy`.
+
+Here's how the user's serve directory and symlink should look:
+
+....
+$ ls -ld /home/goldy/public_gopher /srv/gopher/~goldy
+lrwxrwxrwx 1 goldy goldy   18 Sep 16  2025 /home/goldy/public_gopher -> /srv/gopher/~goldy
+drwxr-xr-x 2 goldy goldy 4096 Sep 16  2025 /srv/gopher/~goldy
+....
+
+(Obviously, change the names to fit your environment.)
+
+See xref:example-sites/README.adoc#dynamic-site[Dynamic Site] for a minimal example site with a user directory.
+--
+
+How do I support gophermap files?::
+How do I support geomyidae index files?::
+How do I support other types of index files?::
+How do I support directory listings?::
+How do I support `URL:` selectors?::
+
+See xref:example-sites/README.adoc#dynamic-site[Dynamic Site] for a minimal example site with support for these features.
+
+== Copyright
+
+Thirteen, a simple Gopher server with CGI support. +
+Copyright 2025 Christopher Williams
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 2.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, see <https://www.gnu.org/licenses/>.

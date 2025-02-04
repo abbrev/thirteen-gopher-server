@@ -1,0 +1,33 @@
+This is the root menu of the example Gopher site.
+
+This menu is an index.gph file which is converted to a
+Gopher menu by the index.cgi script in the site's root
+directory (with the help of render-gph).
+
+[0|About|about.txt|server|port]
+
+Index file tests:
+[1|geomyidae|gph|server|port]
+[1|gemtext|gmi|server|port]
+[1|gophermap|gophermap|server|port]
+[1|Executable gophermap|exe|server|port]
+[1|Floodgap's toybox (another gophermap demo)|toybox|server|port]
+[1|HTML|html|server|port]
+[0|Bob|bob|server|port]
+[1|Dynamic Bob|dbob|server|port]
+[1|ROT13|rot13|server|port]
+
+Other Gopher menu tests:
+[1|Directory listing|dir|server|port]
+[1|ZIP file viewer|zipview/hello.zip|server|port]
+[1|Cameron Kaiser's Databrowser|dbrowse?example|server|port]
+
+Other tests:
+[0|Compressed text file|text.txt|server|port]
+[0|Percent-encoded file name|hello%3F%09%0D%0A%25.txt|server|port]
+[1|User directory|~user|server|port]
+[0|Environment|env|.|.]
+
+Other sites:
+[1|Floodgap||gopher.floodgap.com|70]
+[h|Floodgap Web site|URL:http://www.floodgap.com/|server|port]

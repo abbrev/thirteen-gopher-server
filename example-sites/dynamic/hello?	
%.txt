@@ -1,0 +1,15 @@
+This is a test of URL escaping filenames.
+
+The actual name of this file is
+
+    hello?^I^M^J%.txt
+
+where
+
+    ^I is tab
+    ^M is carriage return
+    ^J is line feed
+
+The name in a selector looks like:
+
+    hello%3F%09%0D%0A%25.txt

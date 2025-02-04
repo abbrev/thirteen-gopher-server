@@ -1,0 +1,19 @@
+1|Databrowser example 1
+-
+This is the first Databrowser example page.
+
+Databrowser is a Perl script written by Cameron Kaiser which
+parses a flat text file and presents it as a Gopher tree. It
+has been ported to Thirteen to demonstrate its versatility
+in running CGI scripts written for other servers (possibly
+with minor tweaks).
+*
+2|Databrowser example 2
+-
+This is the second Databrowser example page.
+
+There's not much to see here.
+*
+3|Databrowser example 3
+-
+This page intentionally left blank.

@@ -1,0 +1,240 @@
+#! /usr/bin/awk -f
+
+# Render a Gemini file to a Gopher menu
+
+BEGIN {
+	server  = ENVIRON["SERVER_NAME"]
+	port    = ENVIRON["SERVER_PORT"]
+	pwd     = ENVIRON["PWD"]
+	docroot = ENVIRON["DOCUMENT_ROOT"]
+	currentPath = substr(pwd, length(docroot)+1)
+}
+
+{
+	# strip off trailing CR
+	# get thee hence, Satan!
+	sub(/\r$/, "")
+}
+
+/^=>[ \t]*[^ \t]*.*/ {
+	#printf "i%s\t\t\t\r\n", $0
+	target = gensub(/^=>[ \t]*([^ \t]*)[ \t]*(.*)$/, "\\1", $0)
+	text = gensub(/^=>[ \t]*([^ \t]*)[ \t]*(.*)$/, "\\2", $0)
+	text = gensub(/\t/, " ", "g", text)
+	text = gensub(/ +$/, "", "1", text)
+	if (text == "") {
+		text = target
+	}
+	if (target ~ /^[a-zA-Z]+:\/\//) {
+		# decode this URL
+		# userinfo    = *( unreserved / pct-encoded / sub-delims / ":" )
+		# unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
+		# pct-encoded   = "%" HEXDIG HEXDIG
+		#    sub-delims    = "!" / "$" / "&" / "'" / "(" / ")"
+		#                  / "*" / "+" / "," / ";" / "="
+		re = "^([A-Za-z]+)://([A-Za-z._~0-9%!$&'()*+,;=:-]*@)?([-a-zA-Z0-9.]+)(:([1-9][0-9]*))?(/[^#?]*)?(\\?[^#]*)?(#.*)?$"
+		# \1 = scheme
+		# \2 = userinfo (with trailing at sign)
+		# \3 = host
+		# \5 = port
+		# \6 = path
+		# \7 = query (with leading question mark)
+		# \8 = fragment (with leading hash sign)
+		scheme  = gensub(re, "\\1", "1", target)
+		urluser = gensub(re, "\\2", "1", target)
+		urlhost = gensub(re, "\\3", "1", target)
+		urlport = gensub(re, "\\5", "1", target)
+		urlpath = gensub(re, "\\6", "1", target)
+		urlqry  = gensub(re, "\\7", "1", target)
+		#printf("iDEBUG: target='%s' scheme='%s' host='%s' port='%s' path='%s' qry='%s'\t\tnull\t70\r\n", target, scheme, urlhost, urlport, urlpath, urlqry);
+		if (urlpath == "") {
+			urlpath = "/"
+		}
+		gtype = ""
+		if (scheme == "gopher") {
+			urlpath_decoded = percent_decode(urlpath)
+			urlpath = urlpath_decoded
+			urlqry_decoded  = percent_decode(urlqry )
+			#printf("iDEBUG: target='%s' scheme='%s' host='%s' port='%s' path='%s' qry='%s'\t\tnull\t70\r\n", target, scheme, urlhost, urlport, urlpath, urlqry);
+			gtype   = gensub(/^\/(.)?(.*)$/, "\\1", "1", urlpath)
+			urlpath = gensub(/^\/(.)?(.*)$/, "\\2", "1", urlpath)
+			urlpath = condense_path(urlpath)
+			gpath = urlpath urlqry
+		}
+	} else if (target ~ /^[a-zA-Z]+:/) {
+		# other URL (mailto:, geo:, etc.)
+		scheme = ""
+	} else {
+		scheme = "gopher"
+		# This link is site-local. Condense the path.
+		#printf("iDEBUG: target='%s'\t\tnull\t70\r\n", target);
+		target = gensub(/#.*$/, "", "1", target) # strip fragment
+		#printf("iDEBUG: before percent_decode: target='%s'\t\tnull\t70\r\n", target);
+		urlpath = gensub(/^([^#?]*)?(\?[^#]*)?(#.*)?$/, "\\1", "1", target)
+		urlqry  = gensub(/^([^#?]*)?(\?[^#]*)?(#.*)?$/, "\\2", "1", target)
+		urlpath = percent_decode(urlpath)
+		urlqry  = percent_decode(urlqry )
+		#printf("iDEBUG:  after percent_decode: target='%s'\t\tnull\t70\r\n", target);
+		if (urlpath ~ /^[^/]/) {
+			# Relative
+			# TODO add other types based on file name etc.
+			if (urlpath ~ /\/$/) {
+				gtype = "1"
+			} else if (urlpath ~ /\.(gmi|gph)$/) {
+				gtype = "1"
+			} else if (urlpath ~ /\.(gif)$/) {
+				gtype = "g"
+			} else if (urlpath ~ /\.(avci|avcs|avif|bmp|heif|heifs|heic|heics|HIF|jpeg|jpg|png|tga|tif|tiff|webp)$/) {
+				gtype = "I"
+			} else if (urlpath ~ /\.(aif|aiff|flac|m4a|mp3|oga|ogg|opus|ra|wav|weba|wma|wv)$/) {
+				gtype = "s"
+			} else if (urlpath ~ /\.(avi|flv|mpeg|mkv|mov|mpg|mp4|ogv|rm|webm|wmv)$/) {
+				gtype = ";"
+			} else if (urlpath ~ /\.(txt|md|asc|asciidoc|adoc)$/) {
+				gtype = "0"
+			} else if (urlpath ~ /<(LICENSE|README)$/) {
+				gtype = "0"
+			} else {
+				gtype = "9"
+			}
+			urlpath = condense_path(currentPath "/" urlpath)
+		} else {
+			# Absolute
+			gtype   = gensub(/^\/(.)?(.*)$/, "\\1", "1", urlpath)
+			urlpath = gensub(/^\/(.)?(.*)$/, "\\2", "1", urlpath)
+			urlpath = condense_path(urlpath)
+		}
+		gpath = urlpath urlqry
+		urlhost = server
+		urlport = port
+	}
+
+	if (scheme == "gopher") {
+		if (urlport == "") {
+			urlport = "70"
+		}
+		if (gtype == "") {
+			gtype = "1"
+		}
+	} else if (scheme == "gemini") {
+		if (urlport == "") {
+			urlport = "1965"
+		}
+		gtype = "G"
+		gpath = urlpath
+	} else if (scheme == "ssh" && urluser == "") {
+		if (urlport == "") {
+			urlport = "22"
+		}
+		gtype = "S"
+		gpath = ""
+	} else if (scheme == "telnet" && urluser == "") {
+		if (urlport == "") {
+			urlport = "23"
+		}
+		gtype = "8"
+		gpath = ""
+	} else {
+		gtype = "h"
+		gpath = "URL:" target
+		urlhost = server
+		urlport = port
+	}
+	printf("%s%s\t%s\t%s\t%s\r\n", gtype, text, gpath, urlhost, urlport);
+	next
+}
+
+/^```/ {
+	if (pre == 1) {
+		pre = 0
+	} else {
+		pre = 1
+	}
+	printf("i%s\t\tnull\t70\r\n", $0);
+	next
+}
+
+pre == 1 {
+	printf("i%s\t\tnull\t70\r\n", $0);
+	next
+}
+
+# bullet
+/^\* / {
+	cmd = "sed 's,^\*  *,* ,' | par w50 h2 p2 s0 j0 R0 2>&1 | grep . | sed 's,^,i,; s,$,\t\tnull\t70\r,'"
+	print $0 | cmd
+	close(cmd)
+	next
+}
+
+# block quote
+/^> / {
+	cmd = "sed 's,^>  *,> ,' | par w50 h0 p2 s0 j0 R0 2>&1 | sed 's,^,i,; s,$,\t\tnull\t70\r,'"
+	print $0 | cmd
+	close(cmd)
+	next
+}
+
+{
+	cmd = "par w50 p0 s0 j0 R0 | sed 's,^,i,; s,$,\t\tnull\t70\r,'"
+	print $0 | cmd
+	close(cmd)
+	next
+}
+
+# Condense . and .. components in a path.
+func condense_path(path,            prev) {
+	# First, condense multiple slashes.
+	path = gensub(/\/+/, "/", "g", path)
+
+	# Second, remove all . components.
+	do {
+		prev = path
+		path = gensub(/(\/\.)+(\/.*|)$/, "\\2", "g", path)
+	} while (path != prev)
+
+	# Then convert /xxx/../yyy or /../yyy to /yyy.
+	do {
+		prev = path
+		path = gensub(/(\/[^/]+)?\/\.\.(\/.*|)$/, "\\2", 1, path)
+	} while (path != prev)
+
+	return path
+}
+
+# percent_decode ported/updated from urldecode.awk from https://werc.cat-v.org/
+BEGIN {
+	hextab ["0"] = 0; hextab ["8"] = 8;
+	hextab ["1"] = 1; hextab ["9"] = 9;
+	hextab ["2"] = 2; hextab ["A"] = hextab ["a"] = 10
+	hextab ["3"] = 3; hextab ["B"] = hextab ["b"] = 11;
+	hextab ["4"] = 4; hextab ["C"] = hextab ["c"] = 12;
+	hextab ["5"] = 5; hextab ["D"] = hextab ["d"] = 13;
+	hextab ["6"] = 6; hextab ["E"] = hextab ["e"] = 14;
+	hextab ["7"] = 7; hextab ["F"] = hextab ["f"] = 15;
+}
+
+func percent_decode(path,                     decoded, i, len, c, c1, c2, code) {
+	decoded = ""
+	len = length(path)
+	for (i = 1; i <= len; ++i) {
+		c = substr(path, i, 1)
+		if (c == "%") {
+			if (i+2 <= len) {
+				c1 = substr(path, i+1, 1)
+				c2 = substr(path, i+2, 1)
+				if (hextab [c1] == "" || hextab [c2] == "") {
+					print "WARNING: invalid hex encoding: %" c1 c2 | "cat >&2"
+				} else {
+					code = 0 + hextab [c1] * 16 + hextab [c2] + 0
+					c = sprintf("%c", code)
+					i = i + 2
+				}
+			} else {
+				print "WARNING: invalid % encoding: " substr(path, i, len - i) | "cat >&2"
+			}
+		}
+		decoded = decoded c
+	}
+	return decoded
+}

@@ -1,0 +1,150 @@
+= Example sites
+:mdash: &#x2014;
+
+== Static Site
+
+This is about the simplest and most bare-bones example site that you'll find.
+There's really not much to say about it.
+
+Serving the static site:
+
+[,sh]
+----
+thirteen -root=example-sites/static -listen=7070 -exclude=.cgi
+----
+
+The `-exclude=.cgi` option ensures that the server will not run any CGIs.
+
+== Dynamic Site
+
+This example site demonstrates how to make CGI scripts to add support for directory listings,
+various menu file formats (gophermap, geomyidae's GPH, HTML, Gemini's GMI, etc.),
+transparently decompressing files,
+browsing ZIP files,
+etc.
+
+Unlike the static site, this one requires using the `-serverhost` option, unless you browse it locally through `localhost`.
+
+Serving the dynamic site:
+
+[,sh]
+----
+thirteen -root=example-sites/dynamic -listen=7070 \
+  -serverhost=YOUR-DOMAIN-NAME \
+  -exclude=.bob \
+  -exclude=.dbob \
+  -exclude=.gmi \
+  -exclude=.gph \
+  -exclude=.htm \
+  -exclude=.html \
+  -exclude=.rot13
+----
+
+The `-exclude` options ensure that the server will not directly serve any files with those extensions; the `index.cgi` in the root will handle those files instead.
+Be sure to replace `YOUR-DOMAIN-NAME` with your domain name (or your IP address).
+
+Feel free to adapt this example site's root `index.cgi` and menu renderers to your liking.
+
+=== Menu formats
+
+This example site supports the following menu formats:
+
+* Gophermap (from Bucktooth, Gophernicus, PyGopherd, Motsognir, etc.)
+* GPH (from geomyidae)
+* Bob (from geomyidae)
+* HTML
+* GMI (from Gemini)
+* ROT13 (because why not)
+
+Any file named `gophermap`, `{asterisk}.gph`, `{asterisk}.bob`, `{asterisk}.dbob`, `{asterisk}.htm`, `{asterisk}.html`, `{asterisk}.gmi`, or `{asterisk}.rot13` is automatically rendered as a Gopher menu from the respective format.
+And any file named `index.__ext__` (where __ext__ is an extension of one of the menu formats) may be omitted in requests:
+a request for `/blah` will retrieve `/blah/index.gph` (or `/blah/index.bob` or `/blah/index.htm` etc.).
+
+Additionally, the extension for menu files may be omitted in requests: a request for `/foo` will retrieve `/foo.gph` (or `/foo.bob` or `/foo.htm` etc.).
+This allows a site admin to have a "`flat`" site structure and still hide the underlying server mechanisms (see https://www.w3.org/Provider/Style/URI[Cool URIs don't change]).
+
+==== Gophermap
+
+The Gophermap renderer currently supports the basic Gophermap format that is supported by most Gopher servers:
+
+* A line starting with `#` is skipped (comment line).
+* A line that does not contain a tab is converted to an info line.
+* A line that contains a tab is handled as a menu line.
+
+A menu line is handled thusly:
+
+* If the server and/or port fields are missing, the current server's name and/or port number are used.
+* If the server field matches the current server's name, treat the menu line as local.
+
+If a menu line is local, this renderer handles selectors most similarly to Bucktooth as it seems the most logical way to handle them (some other servers have odd edge cases with non-local selectors):
+
+. If the selector is blank, set the selector to the display string.
+. If the selector does not start with a slash, make it relative to the current directory.
+
+Note that both steps apply when the selector is blank and the display string does not start with a slash;
+in that case, the display string is used as the selector and is made relative to the current directory.
+
+Besides info lines and menu lines, some Gophernicus directives are supported:
+
+* `=`: include another file as a Gophermap or run a program and render its output as a Gophermap
+* `*`: stop processing and list files in the current directory
+
+The following directives are recognized but ignored:
+
+* `~`: list user Gopher directories (this server does not support user directories)
+* `%`: list available virtual hosts (this server does not support virtual hosts)
+* `-`: hide a file from directory listing
+* `:`: map a file extension to a menu type
+
+The Gophermap format varies widely from server to server, so if you are porting a site from another server to Thirteen, you may need to either customize the Gophermap renderer to match the server it's coming from or modify your Gophermaps to match this renderer.
+
+==== GPH
+
+The GPH renderer supports the geomyidae GPH format but with the following enhancements/extensions:
+
+* A field may end with an escaped backslash (this is a limitation of the geomyidae parser).
+* The server field and/or the port field may be a dot (`.`) rather than `server` or `port`.
+  (Just as `.` in a directory means "`this directory`", `.` means "`this server`" or "`this port`" depending on where it's used.)
++
+You can remove this extension by editing the `serverRegex` and `portRegex` variables in link:dynamic/render-gph[render-gph].
+
+==== Bob
+
+This is a toy language from geomyidae.
+I included it to show how to add custom menu formats and also to show the flexibility of using a renderer from a different server (the script is unmodified except for whitespace changes).
+
+If a file name ends with `.dbob`, its output is interpreted as a GPH menu which can make it easier to generate Gopher menus.
+
+==== HTML
+
+This uses Lynx to dump the HTML page to plain text and then converts each line to an info line.
+It doesn't convert embedded links to Gopher links as it's really just a proof of concept.
+
+==== GMI
+
+This renders a Gemtext file to a Gopher menu.
+Gemtext is a lightweight markup format designed for the Gemini protocol and can be considered a superset of a subset of Markdown.
+
+==== ROT13
+
+This renderer applies ROT13 to the menu file.
+That's it.
+
+=== Transparent decompression
+
+This example site can decompress files transparently.
+A request for `/foo.txt` will return the decompressed contents of a file named `/foo.txt.gz` or `/foo.txt.bz2` or `/foo.txt.zstd`, if one of those exists.
+
+=== Browsing ZIP files
+
+A request for `/zipview/foo.zip` will show the contents of `/foo.zip` as a menu.
+Files within the ZIP file can be retrieved transparently.
+
+[NOTE]
+====
+The `zipview` script currently uses a query string to specify which file to retrieve from the ZIP file, e.g., `/zipview/foo.zip?blah`.
+I would like to reimplement it so that such a request looks like `/zipview/foo.zip/blah`, which looks more like a regular path.
+That will require more fiddling around with `PATH_INFO`.
+
+Consider it a work in progress for now.
+====

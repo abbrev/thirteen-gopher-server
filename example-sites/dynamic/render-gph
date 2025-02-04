@@ -1,0 +1,151 @@
+#! /usr/bin/awk -f
+
+# Convert a geomyidae GPH file to a Gopher menu.
+
+# Unlike the geomyidae GPH renderer, this allows a menu item to end in a
+# backslash. For example:
+#
+# [1|\\|/|server|port]
+#
+# The second backslash is escaped by the first backslash.
+#
+# This also allows the server field and/or the port field to be a dot
+# (.) rather than "server" or "port" to indicate the current
+# server/port.
+
+BEGIN {
+	FS = "|"
+	server  = ENVIRON["SERVER_NAME"]
+	port    = ENVIRON["SERVER_PORT"]
+	pwd     = ENVIRON["PWD"]
+	docroot = ENVIRON["DOCUMENT_ROOT"]
+	currentPath = substr(pwd, length(docroot)+1)
+	serverRegex = "^(server|\\.)$" # or "^server$" for geomyidae compatibility
+	portRegex = "^(port|\\.)$" # or "^port$" for geomyidae compatibility
+}
+
+{
+	# Remove carriage return from all lines.
+	line = gensub(/\r$/, "", 1, $0)
+}
+
+func handle_possible_link() {
+	$NF = gensub(/\r$/, "", 1, $NF)
+
+	# Strip open and close brackets.
+	$1 = gensub(/^\[/, "", 1, $1)
+	$NF = gensub(/\]$/, "", 1, $NF)
+
+	# Merge any field that ends with a backslash with the next
+	# (separated with a pipe).
+	for (i = 1; i < NF; i++) {
+		while (i < NF && ends_with_unescaped_backslash($i)) {
+			# Merge this field with the following field,
+			# separated by a pipe.
+			$i = $i "|" $(i+1)
+			# Shift following fields back.
+			for (j = i+1; j < NF; j++) {
+				$j = $(j+1)
+			}
+			NF--
+		}
+	}
+	# If the last field ends with an unescaped backslash, it's
+	# invalid.
+	if (ends_with_unescaped_backslash($NF)) {
+		return
+	}
+	# Convert backslash-escaped characters to themselves. For
+	# simplicity we don't handle escaped characters like "\n"
+	# specially (i.e., "\n" is simply converted to "n" and not to a
+	# newline as it is in many other contexts).
+	for (i = 1; i <= NF; i++) {
+		$i = gensub(/\\(.)/, "\\1", "g", $i)
+	}
+	# A link must have exactly 5 fields (type, user, selector,
+	# server, port) and a one-character type field.
+	if (NF != 5 || length($1) != 1) {
+		return
+	}
+	if ($4 ~ serverRegex && $5 ~ portRegex &&
+	    $1 !~ /[i238wT]/ &&
+	    !($1 == "h" && $3 ~ /^URL:/)) {
+		# This link is site-local. Condense the path.
+		if ($3 ~ /^[^/]/) {
+			# Relative
+			$3 = condense_path(currentPath "/" $3)
+		} else {
+			# Absolute
+			$3 = condense_path($3)
+		}
+	}
+	$4 = gensub(serverRegex, server, 1, $4)
+	$5 = gensub(portRegex, port, 1, $5)
+
+	# port must be numeric
+	if ($5 !~ /^[0-9]+$/) {
+		return
+	}
+
+	printf "%s%s\t%s\t%s\t%s\r\n", $1, $2, $3, $4, $5
+	next
+}
+
+# Possibly a link:
+# [<type>|<desc>|<path>|<host>|<port>]
+NF >= 5 && $1 ~ /^\[.+/ && $NF ~/\]\r?$/ {
+	handle_possible_link()
+}
+
+# Fall through here if it's not a link!
+
+{
+	# Remove leading [| if there is one.
+	line = gensub(/^\[\|/, "", 1, line)
+
+	# Convert each tab to a space.
+	#
+	# geomyidae prints an error in this case.
+	line = gensub(/\t/, " ", "g", line)
+
+	printf "%s%s\t%s\t%s\t%s\r\n", "i", line, "Err", server, port
+}
+
+END {
+	printf ".\r\n"
+}
+
+########################################################################
+# Helper functions
+########################################################################
+
+# Condense . and .. components in a path.
+func condense_path(path,            query, prev) {
+	query = gensub(/^([^?]*)(\?.*)?$/, "\\2", "1", path)
+	path  = gensub(/^([^?]*)(\?.*)?$/, "\\1", "1", path)
+	# First, condense multiple slashes.
+	path = gensub(/\/+/, "/", "g", path)
+
+	# Second, remove all . components.
+	do {
+		prev = path
+		path = gensub(/(\/\.)+(\/.*|)$/, "\\2", "g", path)
+	} while (path != prev)
+
+	# Then convert /xxx/../yyy or /../yyy to /yyy.
+	do {
+		prev = path
+		path = gensub(/(\/[^/]+)?\/\.\.(\/.*|)$/, "\\2", 1, path)
+	} while (path != prev)
+
+	return path query
+}
+
+
+# A string like "\\" ends with a backslash, but it's escaped.
+#
+# A string like "\\\", on the other hand, is an escaped backslash
+# followed by an unescaped backslash.
+func ends_with_unescaped_backslash(s) {
+	return s ~ /^(\\.|[^\\])*\\$/
+}

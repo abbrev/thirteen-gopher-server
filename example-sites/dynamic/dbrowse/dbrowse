@@ -1,0 +1,46 @@
+#!/usr/bin/perl
+
+# The Databrowser reads through a file looking for markers and gives you a
+# nice gopher tree or displays segments. See the file SAMPLE.dbrowse.
+# Cameron Kaiser
+
+# Very minor tweaks to run on Thirteen by Christopher Williams.
+
+require "./gopherlib.pl";
+$MYDIR = ".";
+
+&return_error($0, "wasn't given sufficient arguments! @ARGV")
+	if (!scalar(@ARGV));
+
+local ($file, @terms) = @ARGV;
+if (!scalar(@terms)) {
+	&return_error($0, "naughty naughty: $file")
+		if ($file =~ m#\./#);
+	open(S, "$MYDIR/$file") || &return_error($0,
+		"was given bad filespec! $MYDIR/$file");
+	undef $/;
+	(@args) = split(/\*\n/, scalar(<S>));
+	foreach(@args) {
+		($q, $a) = split(/\n-\n/, $_);
+		($ds, $dk) = split(/\|/, $q);
+		$dk ||= $ds;
+		$ofg{$ds} = $dk;
+	}
+	foreach(sort { lc($a) cmp lc($b) } keys %ofg) {
+		&offer_choice(0, $ofg{$_}, $_);
+	}
+	exit;
+}
+
+open(S, "$MYDIR/$file") || &return_error($0, "was given bad filespec!");
+undef $/; (@args) = split(/\*\n/, scalar(<S>)); $terms = join(' ', @terms);
+foreach(@args) {
+	($q, $a) = split(/\n-\n/, $_);
+	($ds, $dk) = split(/\|/, $q);
+	$dk ||= $ds;
+	if ($ds eq $terms) {
+		print "$dk\n", "-" x length($dk), "\n\n", $a, "\n\r\n.\r\n";
+		exit;
+	}
+}
+exit;

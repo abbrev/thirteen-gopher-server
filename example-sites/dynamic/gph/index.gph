@@ -1,0 +1,89 @@
+Hello world! This is a test gph index file.
+
+[i|\|Testing\|escaped\|pipes\|||server|port]
+[||Testing|escaped|pipes|
+
+[|Testing lines with opening bracket:
+[|[Opening and closing brackets]
+[|[Opening and closing brackets and lots of pipes|70]
+[|[Opening and closing brackets and lots of pipes||70]
+[|[Opening and closing brackets and lots of pipes|||70]
+[|[Opening and closing brackets and lots of pipes||||70]
+[|[Testing|embedded|pipes!
+
+[1|..|..|server|port]
+[1|This page (with a roundabout link in the gph source)|.//./foo/.//..|server|port]
+[1|Subdirectory|subdir|server|port]
+[1|Other gph file|subdir/other.gph|server|port]
+[1|Home||server|port]
+[1|Home|/foo/..|server|port]
+
+
+# Testing backslashes
+
+## Valid (will be links)
+
+|
+[1|\||.|server|port]
+
+\
+[1|\\|.|server|port]
+
+\|
+[1|\\\||.|server|port]
+
+\
+[1|\\|.|server|por\t]
+
+x|
+[1|x\||.|server|port]
+
+x\
+[1|x\\|.|server|port]
+
+|x\
+[1|\|x\\|.|server|port]
+
+x\|
+[1|x\\\||.|server|port]
+
+|x\|
+[1|\|x\\\||.|server|port]
+
+x\
+[1|x\\|.|server|por\t]
+
+## Invalid (will display as-is)
+
+[|[1|\\\|.|server|port]
+[1|\\\|.|server|port]
+
+[|[1|x\\\|.|server|port]
+[1|x\\\|.|server|port]
+
+[|[1|foo|.|server|port\]
+[1|foo|.|server|port\]
+
+[|[1|foo|.|server|1\]
+[1|foo|.|server|1\]
+
+[|[1|\foo|.|server|foo]
+[1|\foo|.|server|foo]
+
+# From geomyidae's index.gph:
+
+comment
+[1|R-36|/|server|port]
+[0|file - comment|/file.txt|server|port]
+[h|http://www.heise.de|URL:http://www.heise.de|server|port]
+[0|some \| escape and [ special characters ] test|Err|server|port]
+[9|binary data file|/file.dat|server|port]
+[9|unclosed entry|/file.dat|server|port
+[9|some relative path with args|./legacy/caps.txt?key=value|server|port]
+[9|some other relative path|legacy/caps.txt|server|port]
+[|empty type||server|port]
+[|Escape something, [| is skipped.
+some	invalid line
+
+[|[9|binary data file (escaped entry, shown as 'i')|/file.dat|server|port]
+

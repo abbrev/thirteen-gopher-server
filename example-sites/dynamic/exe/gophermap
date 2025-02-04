@@ -1,0 +1,7 @@
+#!/bin/sh
+
+echo '!Executable gophermap'
+echo
+echo "This is an executable gophermap! It's written as a shell script and uses \`fold\` to wrap this long line." | fold -sw 60
+echo
+echo '*'

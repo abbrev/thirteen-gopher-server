@@ -1,0 +1,187 @@
+#! /usr/bin/awk -f
+
+########################################################################
+# Render a gophermap file.
+#
+# This supports many of the features that Gophernicus does.
+#
+# Behavior differs slightly from Gophernicus with blank selectors (more
+# in line with Bucktooth but not exactly).
+#
+# This is still experimental and should not be used in production.
+#
+# Limitations:
+#
+# - Does not currently support hiding files (with a "-" line).
+# - Does not currently support changing file type map (with a ":" line).
+########################################################################
+
+BEGIN {
+	FS = "\t"
+	server  = ENVIRON["SERVER_NAME"]
+	port    = ENVIRON["SERVER_PORT"]
+	pwd     = ENVIRON["PWD"]
+	docroot = ENVIRON["DOCUMENT_ROOT"]
+	depth   = ENVIRON["GOPHERMAP_DEPTH"]
+	currentPath = substr(pwd, length(docroot)+1)
+
+	if (!(depth ~ /^[1-9][0-9]*$/)) {
+		depth = 0
+	} else if (depth > 4) {
+		exit
+	}
+	depth++
+	#printf "i%s\t%s\t%s\t%d\r\n", "depth="depth, "", server, port
+
+	numHidden = 0
+	numMapped = 0
+
+	addHidden("gophermap") # hide gophermap itself
+}
+
+# Comment line. Ignore.
+/^#/ { next }
+
+# List files and finish.
+/^\*/ {
+	# TODO Use hidden and mapped arrays here (the directory lister
+	# must support hiding files and mapping types).
+	cmd = "LS_PARENT=y " docroot "/gopher-ls"
+	system(cmd)
+	exit
+}
+
+# Finish.
+/^\./ { exit }
+
+# Print a list of users with public_gopher (N/A on this server).
+#
+# We could fake this by listing any directory or symlink in the root
+# directory ($DOCUMENT_ROOT) that begins with a ~.
+/^~/ { next }
+
+# print a list of available virtual hosts (N/A on this server)
+/^%/ { next }
+
+/^-/ { addHidden(substr($0, 2)); next }
+
+/^:/ { addMapped(substr($0, 2)); next }
+
+# include gophermap or shell exec
+/^=/ {
+	renderMap = shellEscape(PROCINFO["argv"][0])" "shellEscape(PROCINFO["argv"][1])" "shellEscape(PROCINFO["argv"][2])
+	f = shellEscape(substr($0, 2))
+	cmd = "f="f"; " \
+	"if [ -f \"$f\" ] && ! [ -x \"$f\" ]; then "\
+	  "cat \"$f\"; "\
+	"else "\
+	  "sh -c \"$f\"; "\
+	"fi | GOPHERMAP_DEPTH="depth" "renderMap
+	#printf "%s%s\t%s\t%s\t%s\r\n", "i", cmd, "", "server", "1"
+	system(cmd)
+	next
+}
+
+# line contains at least one tab. output it directly
+/\t/ {
+	# handle empty host
+	if ($3 == "") {
+		$3 = server
+	}
+
+	# handle empty port
+	if ($4 == "") {
+		$4 = port
+	}
+
+	# handle empty selector
+	#
+	# How do we insert a literal empty selector? This seems like a
+	# shortcoming of the gophermap format (or of the way Gophernicus
+	# parses a gophermap)
+	#
+	# Per README.gophermap from Gophernicus:
+	#
+	#     If you don't specify a selector, the name field will be
+	#     also used as the selector.
+	#
+	# Per PyGopherd's manual:
+	#
+	#     The selector is the name of the file on the server. If it
+	#     begins with a slash, it is an absolute path; otherwise, it
+	#     is interpreted relative to the directory that the
+	#     gophermap file is in. If no selector is specified, the
+	#     description is also used as the selector.
+	#
+	# both make it seems like it's the intended behavior.
+	#
+	# On the other hand, Bucktooth seems to use the name field as
+	# the selector only if both the selector field and the host
+	# field are blank; so if a host is explicitly specified, the
+	# selector is used as-is. I'll adopt that behavior (or slightly
+	# modified behavior) here because it makes the most sense to me.
+	if ($3 == server) {
+		if ($2 == "") {
+			# use the display string as the selector
+			$2 = substr($1, 2)
+		}
+
+		if (!($2 ~ /^URL:/) && !($2 ~ /^\//)) {
+			# make the selector relative to the current directory
+			$2 = condense_path(currentPath "/" $2)
+		}
+	}
+	printMenuLine(substr($1, 1, 1), substr($1, 2), $2, $3, $4)
+	next
+}
+
+# Title
+/^!/ { gsub(/^!/, ""); printMenuLine("i", $0, "TITLE", "null.host", 1); next }
+
+{ printMenuLine("i", $0, "", "null.host", 1); next }
+
+
+
+########################################################################
+# Functions
+########################################################################
+
+func addHidden(h) {
+	hidden[numHidden] = h
+	numHidden++
+}
+
+func addMapped(m) {
+	mapped[numMapped] = m
+	numMapped++
+}
+
+func printMenuLine(type, name, selector, host, port) {
+	printf "%s%s\t%s\t%s\t%d\r\n", type, name, selector, host, port
+}
+
+func shellEscape(s) {
+	s = gensub(/'/, "\\'", "g", s)
+	return gensub(/^(.*)$/, "'\\1'", 1, s)
+}
+
+# Condense . and .. components in a path.
+func condense_path(path,            prev) {
+# First, condense multiple slashes.
+	path = gensub(/\/+/, "/", "g", path)
+
+	# Second, remove all . components.
+	do {
+		prev = path
+		path = gensub(/(\/\.)+(\/.*|)$/, "\\2", "g", path)
+	} while (path != prev)
+
+	# Then convert /xxx/../yyy or /../yyy to /yyy.
+	do {
+		prev = path
+		path = gensub(/(\/[^/]+)?\/\.\.(\/.*|)$/, "\\2", 1, path)
+	} while (path != prev)
+
+	return path
+}
+

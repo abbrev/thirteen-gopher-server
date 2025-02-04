@@ -1,0 +1,86 @@
+.TH "THIRTEEN" 8 "2025-09-18" "Thirteen Gopher Server" "thirteen"
+
+.SH NAME
+thirteen \- A lightweight Gopher server
+
+.SH SYNOPSIS
+.SY thirteen
+[-\fBdesc\fR \fIdesc\fR]
+[-\fBexclude\fR \fIextension\fR]
+[-\fBlisten\fR \fI[host:]port\fR]
+[-\fBmaxconn\fR \fImaxconn\fR]
+[-\fBroot\fR \fIroot\fR]
+[-\fBrtmo\fR \fIrtmo\fR]
+[-\fBserverhost\fR \fIhost\fR]
+[-\fBserverport\fR \fIport\fR]
+[-\fBuser\fR \fIuser\fR]
+[-\fBwtmo\fR \fIwtmo\fR]
+.YS
+
+.SH DESCRIPTION
+.PP
+Thirteen is a lightweight Gopher server.
+It is mostly compliant with RFC 1436.
+.SH OPTIONS
+
+
+
+.TP
+\fB-desc\fR \fIdescription\fR
+The server description.
+There is no default value.
+.TP
+\fB-exclude\fR \fIextension\fR
+Exclude files with the given extension.
+E.g., \fB-exclude .hidden\fR or \fB-exclude hidden\fR will cause Thirteen not to serve any file with an extension of \fBhidden\fR.
+.TP
+\fB-listen\fR \fI[host:]port\fR
+The port and optionally host to listen on.
+The default is 70 which means listen on port 70 on all interfaces.
+.TP
+\fB-maxconn\fR \fIconnections\fR
+The maximum number of simultaneous connections.
+The default is 1000.
+.TP
+\fB-root\fR \fIdirectory\fR
+The site root directory.
+The default is \fB/srv/gopher\fR.
+.TP
+\fB-rtmo\fR \fIseconds\fR
+Request timeout in seconds.
+How long to wait to receive a complete request.
+Setting to 0 disables request timeout (not recommended).
+The default is 60.
+.TP
+\fB-serverhost\fR \fIname\fR
+The server host name.
+The default is \fBlocalhost\fR.
+.TP
+\fB-serverport\fR \fIport\fR
+The port to include in menus.
+The default is to use the port to listen on.
+.TP
+\fB-user\fR \fIuser\fR
+The user to run as.
+There is no default value.
+.TP
+\fB-wtmo\fR \fIseconds\fR
+Response timeout in seconds.
+How long to wait for progress to be made on the response.
+Setting to 0 disables response timeout.
+The default is 300.
+
+.SH COPYRIGHT
+Copyright 2025 Christopher Williams.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, see <https://www.gnu.org/licenses/>.

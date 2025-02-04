@@ -1,0 +1,5 @@
+This is an example Gopher site. It demonstrates how to use
+the Thirteen Gopher server and how to make CGI scripts
+to add support for directory listings, various menu file
+formats (gophermap, geomyidae's gph, HTML, GMI, etc.),
+transparently decompressing files, browsing ZIP files, etc.

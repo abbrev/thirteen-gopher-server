@@ -1,0 +1,10 @@
+iThis is an example static Gopher site.			
+i			
+iObviously you'll need to put your own Gopher site host name			
+iand port in any Gopher menu entry that points to menus or			
+ifiles within your site. You can even use a Gopher site			
+igenerator to do that for you if you so wish.			
+i			
+1Home		localhost	7070
+i			
+1Floodgap		gopher.floodgap.com	70

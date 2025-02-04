@@ -1,0 +1,4 @@
+Hello world! This is other.gph in subdir.
+
+[1|..|..|server|port]
+[1|Home||server|port]
