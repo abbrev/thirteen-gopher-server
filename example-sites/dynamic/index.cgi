@@ -120,13 +120,7 @@ if [ "$HANDLE_PATH_INFO" != n ]; then
 		(
 			path="$DOCUMENT_ROOT$SCRIPT_DIR$PATH_INFO"
 			path="${path%/}" # strip trailing slash if any
-			if [ -d "$path" ]; then
-				for i in $indexes; do if [ -f "$path/$i" ] && [ -r "$path/$i" ]; then path="$path/$i"; break; fi; done
-			fi
-			if readable_file "$path"; then
-				# shouldn't happen
-				:
-			elif readable_file "$path.zstd"; then
+			if readable_file "$path.zstd"; then
 				exec zstdcat "$path.zstd"; exit 0
 			elif readable_file "$path.gz"; then
 				exec zcat "$path.gz"; exit 0
@@ -167,8 +161,8 @@ if [ "$HANDLE_PATH_INFO" != n ]; then
 				exit 0
 			fi
 
-			d="$(dirname "$path")"
-			f="$(basename "$path")"
+			d="${path%/*}" # the directory part
+			f="${path##*/}" # the file part
 
 			cd "$d" || exit
 
